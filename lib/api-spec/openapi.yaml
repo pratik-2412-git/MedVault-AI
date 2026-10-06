@@ -3,13 +3,19 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: MedVault AI demo API using fictional healthcare data only.
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: patients
+    description: Patient and clinical history operations
+  - name: consents
+    description: Consent and sharing operations
+  - name: audit
+    description: Access audit operations
 paths:
   /healthz:
     get:
@@ -24,7 +30,193 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /patients/{patientId}:
+    get:
+      operationId: getPatient
+      tags: [patients]
+      summary: Get a patient profile
+      parameters:
+        - $ref: "#/components/parameters/PatientId"
+      responses:
+        "200":
+          description: Patient profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Patient"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /patients/{patientId}/records:
+    get:
+      operationId: getPatientRecords
+      tags: [patients]
+      summary: Get a patient's verified medical records
+      parameters:
+        - $ref: "#/components/parameters/PatientId"
+      responses:
+        "200":
+          description: Medical records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClinicalRecord"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /patients/{patientId}/summary:
+    get:
+      operationId: getPatientSummary
+      tags: [patients]
+      summary: Get the latest AI-assisted clinical summary
+      parameters:
+        - $ref: "#/components/parameters/PatientId"
+      responses:
+        "200":
+          description: Clinical summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiSummary"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /patients/{patientId}/summary/generate:
+    post:
+      operationId: generatePatientSummary
+      tags: [patients]
+      summary: Generate a deterministic demo clinical summary
+      parameters:
+        - $ref: "#/components/parameters/PatientId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SummaryGenerateInput"
+      responses:
+        "200":
+          description: Generated clinical summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiSummary"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /patients/{patientId}/consents:
+    get:
+      operationId: getPatientConsents
+      tags: [consents]
+      summary: List a patient's consent records
+      parameters:
+        - $ref: "#/components/parameters/PatientId"
+      responses:
+        "200":
+          description: Consent records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Consent"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /consents/{consentId}/approve:
+    post:
+      operationId: approveConsent
+      tags: [consents]
+      summary: Approve a consent request
+      parameters:
+        - $ref: "#/components/parameters/ConsentId"
+      responses:
+        "200":
+          description: Updated consent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Consent"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /consents/{consentId}/revoke:
+    post:
+      operationId: revokeConsent
+      tags: [consents]
+      summary: Revoke an active consent
+      parameters:
+        - $ref: "#/components/parameters/ConsentId"
+      responses:
+        "200":
+          description: Updated consent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Consent"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /consents/{consentId}/modify:
+    post:
+      operationId: modifyConsent
+      tags: [consents]
+      summary: Modify a consent duration
+      parameters:
+        - $ref: "#/components/parameters/ConsentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConsentModifyInput"
+      responses:
+        "200":
+          description: Updated consent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Consent"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /patients/{patientId}/audit-logs:
+    get:
+      operationId: getPatientAuditLogs
+      tags: [audit]
+      summary: Get a patient's consent and access audit trail
+      parameters:
+        - $ref: "#/components/parameters/PatientId"
+      responses:
+        "200":
+          description: Audit events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditEvent"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
+  parameters:
+    PatientId:
+      name: patientId
+      in: path
+      required: true
+      description: Demo patient identifier
+      schema:
+        type: number
+        minimum: 1
+    ConsentId:
+      name: consentId
+      in: path
+      required: true
+      description: Demo consent identifier
+      schema:
+        type: number
+        minimum: 1
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +225,201 @@ components:
           type: string
       required:
         - status
-
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+    Patient:
+      type: object
+      required:
+        - id
+        - name
+        - age
+        - healthId
+        - allergy
+        - conditions
+        - medicines
+        - facility
+        - facilityType
+        - avatarInitials
+      properties:
+        id:
+          type: number
+        name:
+          type: string
+        age:
+          type: number
+        healthId:
+          type: string
+        allergy:
+          type: string
+        conditions:
+          type: array
+          items:
+            type: string
+        medicines:
+          type: array
+          items:
+            type: string
+        facility:
+          type: string
+        facilityType:
+          type: string
+        avatarInitials:
+          type: string
+    ClinicalRecord:
+      type: object
+      required:
+        - id
+        - title
+        - category
+        - date
+        - facility
+        - detail
+        - status
+        - sourceDocument
+      properties:
+        id:
+          type: number
+        title:
+          type: string
+        category:
+          type: string
+        date:
+          type: string
+        facility:
+          type: string
+        detail:
+          type: string
+        status:
+          type: string
+          enum: [Verified, Pending]
+        sourceDocument:
+          type: string
+    SummaryClaim:
+      type: object
+      required:
+        - id
+        - label
+        - value
+        - category
+        - confidence
+        - sourceRecordIds
+      properties:
+        id:
+          type: number
+        label:
+          type: string
+        value:
+          type: string
+        category:
+          type: string
+        confidence:
+          type: string
+          enum: [High, Medium, Review]
+        sourceRecordIds:
+          type: array
+          items:
+            type: number
+    AiSummary:
+      type: object
+      required:
+        - id
+        - generatedAt
+        - generatedBy
+        - claims
+        - disclaimer
+        - recordCount
+      properties:
+        id:
+          type: number
+        generatedAt:
+          type: string
+        generatedBy:
+          type: string
+        claims:
+          type: array
+          items:
+            $ref: "#/components/schemas/SummaryClaim"
+        disclaimer:
+          type: string
+        recordCount:
+          type: number
+    SummaryGenerateInput:
+      type: object
+      properties:
+        requestedBy:
+          type: string
+          default: Demo clinician
+    Consent:
+      type: object
+      required:
+        - id
+        - patientId
+        - patientName
+        - provider
+        - purpose
+        - sharedRecords
+        - durationDays
+        - status
+        - requestedAt
+        - expiresAt
+      properties:
+        id:
+          type: number
+        patientId:
+          type: number
+        patientName:
+          type: string
+        provider:
+          type: string
+        purpose:
+          type: string
+        sharedRecords:
+          type: array
+          items:
+            type: string
+        durationDays:
+          type: number
+        status:
+          type: string
+          enum: [Active, Pending, Revoked, Expired]
+        requestedAt:
+          type: string
+        expiresAt:
+          type: string
+    ConsentModifyInput:
+      type: object
+      required:
+        - durationDays
+      properties:
+        durationDays:
+          type: number
+          minimum: 1
+          maximum: 365
+    AuditEvent:
+      type: object
+      required:
+        - id
+        - event
+        - actor
+        - purpose
+        - timestamp
+        - tone
+      properties:
+        id:
+          type: number
+        event:
+          type: string
+        actor:
+          type: string
+        purpose:
+          type: string
+        timestamp:
+          type: string
+        tone:
+          type: string
+          enum: [success, info, warning]

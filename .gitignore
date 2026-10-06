@@ -47,3 +47,11 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Environment variables (contains DB credentials, API keys)
+.env
+.env.local
+.env.*.local
+artifacts/api-server/.env
+lib/db/.env
+install-log.txt

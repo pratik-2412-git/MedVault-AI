@@ -1,16 +1,31 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import pg from "pg";
-import * as schema from "./schema";
+/**
+ * lib/db/src/index.ts
+ *
+ * Drizzle db instance + all table exports.
+ * No .ts extension on imports — allowImportingTsExtensions is not enabled.
+ * The legacy schema/ folder must be deleted so './schema' resolves to schema.ts
+ */
 
-const { Pool } = pg;
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+import * as schema from './schema';
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
-}
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL?.includes('localhost')
+    ? false
+    : { rejectUnauthorized: false },
+});
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 export const db = drizzle(pool, { schema });
 
-export * from "./schema";
+export {
+  facilitiesTable,
+  patientsTable,
+  doctorsTable,
+  clinicalRecordsTable,
+  documentsTable,
+  aiSummariesTable,
+  auditLogsTable,
+  consentsTable,
+} from './schema';

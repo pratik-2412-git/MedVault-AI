@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "MedVault AI"
+description = "A responsive ABHA/ABDM-compatible healthcare prototype that gives patients and authorized doctors a verified, source-linked view of lifelong medical history with deterministic AI-assisted summaries, QR health cards, consent controls, and audit trails using fictional demo data."
+version = "1.0.0"
+id = "artifacts/medvault-ai"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18559
+
+[services.development]
+run = "pnpm --filter @workspace/medvault-ai run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/medvault-ai", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/medvault-ai/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18559"
+BASE_PATH = "/"
