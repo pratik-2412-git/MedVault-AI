@@ -1,14 +1,16 @@
 /**
  * artifacts/api-server/src/lib/medvault.ts
  *
- * All column names match schema.sql v2:
- *   patients:  allergies[], chronicConditions[], currentMedicines[]
- *   clinical_records: recordType, description, date, verified, verifiedBy, createdBy
+ * Data layer for MedVault AI (Drizzle only — no raw SQL).
  *
- * Gemini integration: stable model (default gemini-3-flash, override via
- * GEMINI_MODEL in .env), with automatic retry on 503 (overloaded) and on
- * MAX_TOKENS truncation (retries with a larger token budget).
+ * CHANGES in this version
+ *  - Doctor <-> patient assignments (isDoctorAssigned / getAssignedPatients)
+ *  - Patient + doctor lookups include the facility NAME
+ *  - Gemini integration fixed: gemini-1.5-flash is retired, so the model is
+ *    configurable (GEMINI_MODEL) with fallbacks; API key sent in a header;
+ *    real, readable errors; claims carry source records.
  */
+
 import {
   db,
   patientsTable,
@@ -17,82 +19,87 @@ import {
   facilitiesTable,
   aiSummariesTable,
   auditLogsTable,
-  consentsTable,
-} from "../../../../lib/db/src";
-import { eq, desc, and, isNull } from "drizzle-orm";
+  doctorPatientAssignmentsTable,
+} from '../../../../lib/db/src';
+import { eq, desc, and, isNull } from 'drizzle-orm';
 
-// ─── Inferred types ──────────────────────────────────────────────────────────
-type Patient        = typeof patientsTable.$inferSelect;
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type PatientRow     = typeof patientsTable.$inferSelect;
+type DoctorRow      = typeof doctorsTable.$inferSelect;
 type ClinicalRecord = typeof clinicalRecordsTable.$inferSelect;
-type AiSummary       = typeof aiSummariesTable.$inferSelect;
-type AuditLog        = typeof auditLogsTable.$inferSelect;
-type Consent         = typeof consentsTable.$inferSelect;
+type AiSummary      = typeof aiSummariesTable.$inferSelect;
+type AuditLog       = typeof auditLogsTable.$inferSelect;
 
-// ─── Patients ────────────────────────────────────────────────────────────────
+export type PatientWithFacility = PatientRow & { facilityName: string | null };
+export type DoctorWithFacility  = DoctorRow & { facility: string | null };
 
-export async function getPatientByStringId(patientId: string): Promise<Patient | null> {
+// ─── Patients ─────────────────────────────────────────────────────────────────
+
+export async function getPatientByStringId(patientId: string): Promise<PatientWithFacility | null> {
   const rows = await db
-    .select()
+    .select({ patient: patientsTable, facilityName: facilitiesTable.name })
     .from(patientsTable)
+    .leftJoin(facilitiesTable, eq(patientsTable.facilityId, facilitiesTable.id))
     .where(eq(patientsTable.patientId, patientId))
     .limit(1);
-  return rows[0] ?? null;
+  const r = rows[0];
+  return r ? { ...r.patient, facilityName: r.facilityName } : null;
 }
 
-export async function getAllPatients() {
-  return db
-    .select({
-      id:                patientsTable.id,
-      patientId:         patientsTable.patientId,
-      name:              patientsTable.name,
-      age:               patientsTable.age,
-      gender:            patientsTable.gender,
-      healthId:          patientsTable.healthId,
-      allergies:         patientsTable.allergies,
-      chronicConditions: patientsTable.chronicConditions,
-      currentMedicines:  patientsTable.currentMedicines,
-      facilityId:        patientsTable.facilityId,
-    })
-    .from(patientsTable)
-    .orderBy(patientsTable.patientId);
-}
+// ─── Doctors & assignments ────────────────────────────────────────────────────
 
-// ─── Doctors ─────────────────────────────────────────────────────────────────
-
-export async function getDoctorByRegNumber(regNum: string) {
+export async function getDoctorByRegNumber(regNum: string): Promise<DoctorWithFacility | null> {
   const rows = await db
-    .select()
+    .select({ doctor: doctorsTable, facility: facilitiesTable.name })
     .from(doctorsTable)
-    .where(eq(doctorsTable.registrationNumber, regNum))
+    .leftJoin(facilitiesTable, eq(doctorsTable.facilityId, facilitiesTable.id))
+    .where(eq(doctorsTable.registrationNumber, regNum.trim().toUpperCase()))
     .limit(1);
-  return rows[0] ?? null;
+  const r = rows[0];
+  return r ? { ...r.doctor, facility: r.facility } : null;
 }
 
-// ─── Clinical Records ────────────────────────────────────────────────────────
+/** True only if an assignment row links this doctor to this patient. */
+export async function isDoctorAssigned(doctorId: number, patientDbId: number): Promise<boolean> {
+  const rows = await db
+    .select({ id: doctorPatientAssignmentsTable.id })
+    .from(doctorPatientAssignmentsTable)
+    .where(
+      and(
+        eq(doctorPatientAssignmentsTable.doctorId, doctorId),
+        eq(doctorPatientAssignmentsTable.patientId, patientDbId),
+      ),
+    )
+    .limit(1);
+  return rows.length > 0;
+}
 
-export async function getRecords(patientDbId: number) {
+/** Only the patients assigned to this doctor. */
+export async function getAssignedPatients(doctorId: number): Promise<PatientWithFacility[]> {
+  const rows = await db
+    .select({ patient: patientsTable, facilityName: facilitiesTable.name })
+    .from(doctorPatientAssignmentsTable)
+    .innerJoin(patientsTable, eq(doctorPatientAssignmentsTable.patientId, patientsTable.id))
+    .leftJoin(facilitiesTable, eq(patientsTable.facilityId, facilitiesTable.id))
+    .where(eq(doctorPatientAssignmentsTable.doctorId, doctorId))
+    .orderBy(patientsTable.patientId);
+  return rows.map((r) => ({ ...r.patient, facilityName: r.facilityName }));
+}
+
+// ─── Clinical records ─────────────────────────────────────────────────────────
+
+export async function getRecords(patientDbId: number): Promise<ClinicalRecord[]> {
   return db
     .select()
     .from(clinicalRecordsTable)
-    .where(
-      and(
-        eq(clinicalRecordsTable.patientId, patientDbId),
-        isNull(clinicalRecordsTable.deletedAt),
-      ),
-    )
-    .orderBy(desc(clinicalRecordsTable.date));
+    .where(and(eq(clinicalRecordsTable.patientId, patientDbId), isNull(clinicalRecordsTable.deletedAt)))
+    .orderBy(desc(clinicalRecordsTable.date), desc(clinicalRecordsTable.id));
 }
 
 export async function addRecord(
   patientDbId: number,
-  doctorId: number,
-  data: {
-    recordType: string;
-    title: string;
-    description: string;
-    date: string;
-    verified?: boolean;
-  },
+  data: { recordType: string; title: string; description: string; date: string; verified?: boolean },
   doctorDbId: number,
 ) {
   const rows = await db
@@ -114,18 +121,17 @@ export async function addRecord(
 export async function updateRecord(
   recordId: number,
   patientDbId: number,
-  data: Partial<{
-    recordType: string;
-    title: string;
-    description: string;
-    date: string;
-    verified: boolean;
-  }>,
+  data: Partial<{ recordType: string; title: string; description: string; date: string; verified: boolean }>,
   doctorDbId: number,
 ) {
   const rows = await db
     .update(clinicalRecordsTable)
-    .set({ ...data, updatedBy: doctorDbId, updatedAt: new Date() })
+    .set({
+      ...data,
+      verifiedBy: data.verified === true ? doctorDbId : data.verified === false ? null : undefined,
+      updatedBy:  doctorDbId,
+      updatedAt:  new Date(),
+    })
     .where(
       and(
         eq(clinicalRecordsTable.id, recordId),
@@ -137,7 +143,13 @@ export async function updateRecord(
   return rows[0] ?? null;
 }
 
-// ─── AI Summaries ────────────────────────────────────────────────────────────
+/** Postgres unique_violation (23505) — works with or without a driver wrapper. */
+export function isUniqueViolation(err: unknown): boolean {
+  const e = err as { code?: string; cause?: { code?: string } };
+  return e?.code === '23505' || e?.cause?.code === '23505';
+}
+
+// ─── AI summaries ─────────────────────────────────────────────────────────────
 
 export async function getLatestSummary(patientDbId: number): Promise<AiSummary | null> {
   const rows = await db
@@ -149,241 +161,211 @@ export async function getLatestSummary(patientDbId: number): Promise<AiSummary |
   return rows[0] ?? null;
 }
 
-const TOKEN_BUDGETS = [4000, 6000, 8000];
-
-async function callGeminiOnce(
-  model: string,
-  apiKey: string,
-  prompt: string,
-  maxOutputTokens: number,
-): Promise<{ text: string; truncated: boolean }> {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.1, maxOutputTokens },
-      }),
-    },
-  );
-
-  if (response.status === 503) {
-    const err = new Error("OVERLOADED") as Error & { status?: number };
-    err.status = 503;
-    throw err;
+/** Error whose message is safe to show the doctor in the UI. */
+export class AiServiceError extends Error {
+  constructor(message: string, public httpStatus = 502) {
+    super(message);
+    this.name = 'AiServiceError';
   }
+}
 
-  if (!response.ok) {
-    throw new Error(
-      `Gemini API error (model="${model}"): ${response.status} ${await response.text()}`,
+const DISCLAIMER =
+  'AI-generated summary. Verify important information against the original medical records. This tool does not diagnose or prescribe treatment.';
+
+// gemini-1.5-* and (since mid-2026) gemini-2.5-* return 404, so try the configured
+// model first, then current fallbacks. Override with GEMINI_MODEL in .env.
+const FALLBACK_MODELS = ['gemini-3-flash-preview', 'gemini-3.5-flash', 'gemini-flash-latest'];
+
+function modelCandidates(): string[] {
+  const configured = process.env.GEMINI_MODEL?.trim();
+  return [...new Set([configured, ...FALLBACK_MODELS].filter((m): m is string => !!m))];
+}
+
+async function callGemini(prompt: string): Promise<{ text: string; model: string }> {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) {
+    throw new AiServiceError(
+      'AI service is not configured. Add GEMINI_API_KEY to your .env file and restart the backend.',
+      503,
     );
   }
 
-  const geminiData = (await response.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
-  };
-  const candidate = geminiData?.candidates?.[0];
-  const text = candidate?.content?.parts?.[0]?.text ?? "{}";
-  const truncated = candidate?.finishReason === "MAX_TOKENS";
-
-  return { text, truncated };
-}
-
-async function callGemini(model: string, apiKey: string, prompt: string): Promise<string> {
-  for (let i = 0; i < TOKEN_BUDGETS.length; i++) {
-    const budget = TOKEN_BUDGETS[i];
-
-    let result: { text: string; truncated: boolean } | null = null;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        result = await callGeminiOnce(model, apiKey, prompt, budget);
-        break;
-      } catch (e: unknown) {
-        const isOverloaded = (e as { status?: number })?.status === 503;
-        if (isOverloaded && attempt < 3) {
-          await new Promise((r) => setTimeout(r, attempt * 1000));
-          continue;
-        }
-        throw e;
-      }
+  const tried: string[] = [];
+  for (const model of modelCandidates()) {
+    let res: Response;
+    try {
+      res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+        {
+          method: 'POST',
+          // key in a header (not the URL) so it never ends up in logs
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 8192, responseMimeType: 'application/json' },
+          }),
+        },
+      );
+    } catch {
+      throw new AiServiceError('Could not reach the Gemini API. Check the backend machine\'s internet connection.');
     }
-    if (!result) throw new Error("Gemini call failed after retries.");
 
-    if (!result.truncated) {
-      return result.text;
+    if (res.status === 404) { tried.push(model); continue; } // retired / unknown model → next
+    const raw = await res.text();
+
+    if (res.status === 400 && /api key not valid|API_KEY_INVALID/i.test(raw)) {
+      throw new AiServiceError('Gemini rejected the API key. Check GEMINI_API_KEY in .env and restart the backend.');
     }
-    // else: truncated — retry with the next, larger token budget
+    if (res.status === 401 || res.status === 403) {
+      throw new AiServiceError('Gemini denied access (invalid key or API not enabled for this key). Check GEMINI_API_KEY.');
+    }
+    if (res.status === 429) {
+      throw new AiServiceError('Gemini quota/rate limit reached. Wait a minute and try again.', 429);
+    }
+    if (res.status === 503) {
+      throw new AiServiceError('Gemini is temporarily overloaded. Please try again shortly.', 503);
+    }
+    if (!res.ok) {
+      throw new AiServiceError(`Gemini API error ${res.status}: ${raw.slice(0, 200)}`);
+    }
+
+    const data = JSON.parse(raw) as {
+      candidates?: { finishReason?: string; content?: { parts?: { text?: string; thought?: boolean }[] } }[];
+      promptFeedback?: { blockReason?: string };
+    };
+    const cand = data.candidates?.[0];
+    const text = (cand?.content?.parts ?? []).filter((p) => !p.thought).map((p) => p.text ?? '').join('').trim();
+    if (!text) {
+      throw new AiServiceError(
+        `Gemini returned no content (${data.promptFeedback?.blockReason ?? cand?.finishReason ?? 'empty response'}).`,
+      );
+    }
+    return { text, model };
   }
 
-  throw new Error(
-    `Gemini's response kept getting cut off even at ${TOKEN_BUDGETS[TOKEN_BUDGETS.length - 1]} tokens. ` +
-    "This patient may have too many records to summarise in one call.",
+  throw new AiServiceError(
+    `No available Gemini model (tried: ${tried.join(', ')}). Set GEMINI_MODEL in .env to a current model ` +
+      'listed at https://ai.google.dev/gemini-api/docs/models and restart the backend.',
   );
 }
 
+const asStrings = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim() !== '') : [];
+
 export async function generateAiSummary(
-  patient: Patient,
+  patient: PatientRow,
   records: ClinicalRecord[],
   doctorName: string,
 ): Promise<AiSummary> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY not configured.");
-
-  const model = process.env.GEMINI_MODEL || "gemini-3.6-flash";
-
   const recordText = records
     .map(
       (r) =>
-        `[${r.date}] ${r.recordType.toUpperCase()} — ${r.title}: ${r.description ?? ""} (Verified: ${r.verified})`,
+        `[#${r.id}] ${r.date} | ${r.recordType} | ${r.verified ? 'VERIFIED' : 'UNVERIFIED'} | ${r.title}: ${r.description}`,
     )
-    .join("\n");
+    .join('\n');
 
-  const prompt = `You are a clinical summarisation assistant. Produce a structured JSON summary.
-Do NOT diagnose or prescribe. Only summarise verified records.
-Keep each array entry brief (under 12 words) so the full JSON fits in the response.
+  const prompt = `You are a clinical summarisation assistant for a doctor. Summarise ONLY facts stated in the records below.
+Do NOT diagnose, do NOT suggest or prescribe treatment, do NOT invent anything.
+Facts that come only from UNVERIFIED records must be listed under "needsVerification", not in the other sections.
 
-Patient: ${patient.name}, Age ${patient.age}, Gender ${patient.gender}
-Known Allergies: ${(patient.allergies ?? []).join(", ") || "None"}
-Chronic Conditions: ${(patient.chronicConditions ?? []).join(", ") || "None"}
-Current Medicines: ${(patient.currentMedicines ?? []).join(", ") || "None"}
+Patient: ${patient.name}, age ${patient.age}, ${patient.gender}
+Allergies on file: ${patient.allergies.join(', ') || 'None'}
+Chronic conditions on file: ${patient.chronicConditions.join(', ') || 'None'}
+Current medicines on file: ${patient.currentMedicines.join(', ') || 'None'}
 
-Clinical Records:
+Records (format: [#recordId] date | type | verification | title: details):
 ${recordText}
 
-Return ONLY valid JSON (no markdown fences) with this exact shape:
+Return ONLY a JSON object with exactly these keys:
 {
-  "allergies": ["..."],
-  "medicines": ["..."],
-  "conditions": ["..."],
-  "surgeries": ["..."],
-  "labFindings": ["..."],
-  "vaccinations": ["..."],
-  "timeline": [{"date":"YYYY-MM-DD","event":"..."}],
-  "alerts": ["..."],
-  "needsVerification": ["..."]
-}`;
+  "allergies": ["..."], "medicines": ["..."], "conditions": ["..."], "surgeries": ["..."],
+  "labFindings": ["..."], "vaccinations": ["..."],
+  "timeline": [{"date": "YYYY-MM-DD", "event": "...", "recordId": 0}],
+  "alerts": ["..."], "needsVerification": ["..."],
+  "sources": [{"claim": "<exact text of one item above>", "recordId": 0}]
+}
+"sources" must cite, for every item in the lists above, the numeric record id (the number after #) it came from.`;
 
-  const rawText = await callGemini(model, apiKey, prompt);
-  const cleaned = rawText.replace(/```json|```/g, "").trim();
+  const { text } = await callGemini(prompt);
 
-  let claims: Record<string, unknown>;
+  let parsed: Record<string, unknown>;
   try {
-    claims = JSON.parse(cleaned) as Record<string, unknown>;
+    const cleaned = text.replace(/^```(?:json)?|```$/gim, '').trim();
+    parsed = JSON.parse(cleaned.slice(cleaned.indexOf('{'), cleaned.lastIndexOf('}') + 1)) as Record<string, unknown>;
   } catch {
-    claims = { raw: cleaned };
+    throw new AiServiceError('Gemini returned a response that could not be read. Please click Generate again.');
   }
 
-  const disclaimer =
-    "AI-generated summary. Verify important information against the original medical records. This tool does not diagnose or prescribe treatment.";
+  const byId = new Map(records.map((r) => [r.id, r]));
+  const sources = (Array.isArray(parsed.sources) ? parsed.sources : [])
+    .map((s) => s as { claim?: unknown; recordId?: unknown })
+    .filter((s) => typeof s.claim === 'string' && typeof s.recordId === 'number' && byId.has(s.recordId))
+    .map((s) => {
+      const rec = byId.get(s.recordId as number)!;
+      return { claim: s.claim as string, recordId: rec.id, recordTitle: rec.title, recordDate: String(rec.date) };
+    });
+
+  const timeline = (Array.isArray(parsed.timeline) ? parsed.timeline : [])
+    .map((t) => t as { date?: unknown; event?: unknown; recordId?: unknown })
+    .filter((t) => typeof t.date === 'string' && typeof t.event === 'string')
+    .map((t) => ({
+      date: t.date as string,
+      event: t.event as string,
+      recordId: typeof t.recordId === 'number' && byId.has(t.recordId) ? t.recordId : null,
+    }));
+
+  const claims = {
+    allergies:         asStrings(parsed.allergies),
+    medicines:         asStrings(parsed.medicines),
+    conditions:        asStrings(parsed.conditions),
+    surgeries:         asStrings(parsed.surgeries),
+    labFindings:       asStrings(parsed.labFindings),
+    vaccinations:      asStrings(parsed.vaccinations),
+    timeline,
+    alerts:            asStrings(parsed.alerts),
+    needsVerification: asStrings(parsed.needsVerification),
+    sources,
+  };
 
   const rows = await db
     .insert(aiSummariesTable)
-    .values({
-      patientId:   patient.id,
-      generatedBy: doctorName,
-      claims,
-      disclaimer,
-      recordCount: records.length,
-    })
+    .values({ patientId: patient.id, generatedBy: doctorName, claims, disclaimer: DISCLAIMER, recordCount: records.length })
     .returning();
-
   return rows[0];
 }
 
 export function serializeSummary(s: AiSummary) {
   return {
-    id:          s.id,
-    patientId:   s.patientId,
+    id: s.id,
+    patientId: s.patientId,
     generatedAt: s.generatedAt,
     generatedBy: s.generatedBy,
-    claims:      s.claims,
-    disclaimer:  s.disclaimer,
+    claims: s.claims,
+    disclaimer: s.disclaimer,
     recordCount: s.recordCount,
   };
 }
 
-// ─── Audit Logs ──────────────────────────────────────────────────────────────
+// ─── Audit logs ───────────────────────────────────────────────────────────────
 
 export async function addAuditEvent(
   patientDbId: number,
   event: string,
   actor: string,
   purpose: string,
-  tone: "success" | "info" | "warning" = "info",
+  tone: 'success' | 'info' | 'warning' = 'info',
 ) {
-  await db
-    .insert(auditLogsTable)
-    .values({ patientId: patientDbId, event, actor, purpose, tone });
+  await db.insert(auditLogsTable).values({ patientId: patientDbId, event, actor, purpose, tone });
 }
 
-export function serializeAuditEvent(e: AuditLog) {
-  return {
-    id:        e.id,
-    event:     e.event,
-    actor:     e.actor,
-    purpose:   e.purpose,
-    timestamp: e.timestamp,
-    tone:      e.tone,
-  };
-}
-
-export async function getAuditLogs(patientDbId: number) {
+export async function getAuditLogs(patientDbId: number): Promise<AuditLog[]> {
   return db
     .select()
     .from(auditLogsTable)
     .where(eq(auditLogsTable.patientId, patientDbId))
-    .orderBy(desc(auditLogsTable.timestamp));
+    .orderBy(desc(auditLogsTable.timestamp), desc(auditLogsTable.id));
 }
 
-// ─── Consents ────────────────────────────────────────────────────────────────
-
-export async function getConsent(consentId: number): Promise<Consent | null> {
-  const rows = await db
-    .select()
-    .from(consentsTable)
-    .where(eq(consentsTable.id, consentId))
-    .limit(1);
-  return rows[0] ?? null;
-}
-
-export function serializeConsent(c: Consent) {
-  return {
-    id:           c.id,
-    patientId:    c.patientId,
-    patientName:  c.patientName,
-    provider:     c.provider,
-    purpose:      c.purpose,
-    sharedRecords:c.sharedRecords,
-    durationDays: c.durationDays,
-    status:       c.status,
-    requestedAt:  c.requestedAt,
-    expiresAt:    c.expiresAt,
-  };
-}
-
-export async function updateConsentStatus(consentId: number, status: "Active" | "Revoked") {
-  const rows = await db
-    .update(consentsTable)
-    .set({ status })
-    .where(eq(consentsTable.id, consentId))
-    .returning();
-  return rows[0];
-}
-
-export async function updateConsentDuration(consentId: number, durationDays: number) {
-  const [consent] = await db
-    .select()
-    .from(consentsTable)
-    .where(eq(consentsTable.id, consentId))
-    .limit(1);
-  if (!consent || consent.status !== "Active") return null;
-  const newExpiry = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
-  const [updated] = await db
-    .update(consentsTable)
-    .set({ durationDays, expiresAt: newExpiry })
-    .where(eq(consentsTable.id, consentId))
-    .returning();
-  return updated;
+export function serializeAuditEvent(e: AuditLog) {
+  return { id: e.id, event: e.event, actor: e.actor, purpose: e.purpose, timestamp: e.timestamp, tone: e.tone };
 }
