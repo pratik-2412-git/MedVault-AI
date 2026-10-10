@@ -1,5 +1,5 @@
 -- MedVault AI — Seed Data
--- Safe to re-run: uses INSERT ... ON CONFLICT DO NOTHING
+-- Safe to re-run: every INSERT is ON CONFLICT DO NOTHING (needs migrations/002 applied first)
 -- Run AFTER schema.sql
 
 BEGIN;
@@ -244,7 +244,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0001'),'prescription',
  'Prescription — Metformin 500 mg & Amlodipine 5 mg',
  'Continuing Metformin 500 mg twice daily with meals for Type 2 Diabetes. Amlodipine 5 mg once daily for Hypertension. Review in 3 months with HbA1c and renal function tests.',
- '2025-08-12',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0002'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0002'));
+ '2025-08-12',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0002'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0002'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0002: Rajesh Bhatia
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -271,7 +272,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0002'),'prescription',
  'Updated Cardiac Medication Plan',
  'Atorvastatin 40 mg OD, Aspirin 75 mg OD, Metoprolol 25 mg BD. Clopidogrel discontinued (>1 year post-PCI). Annual echocardiogram advised.',
- '2025-06-10',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0001'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0001'));
+ '2025-06-10',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0001'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0001'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0003: Deepa Krishnan
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -298,7 +300,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0003'),'prescription',
  'Asthma Step-Up Therapy',
  'Salbutamol 100 mcg MDI PRN, Budesonide/Formoterol 160/4.5 mcg BD. Written asthma action plan provided. Review in 6 weeks.',
- '2025-01-12',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0006'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0006'));
+ '2025-01-12',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0006'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0006'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0004: Mohan Iyer
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -325,7 +328,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0004'),'vaccination',
  'Pneumococcal & Influenza Vaccines',
  'PPSV23 administered (CKD indication). Influenza vaccine (seasonal quadrivalent) given. Both tolerated well. Next influenza vaccine due annual.',
- '2025-02-03',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0011'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0011'));
+ '2025-02-03',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0011'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0011'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0005: Priya Kapoor
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -352,7 +356,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0005'),'hospital_visit',
  'Rheumatology Review — Stable Disease',
  'DAS28 score 2.9 (low activity). Patient tolerating DMARDs well. Joint swelling markedly reduced. Continue current regimen. Next review in 4 months.',
- '2025-05-15',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0004'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0004'));
+ '2025-05-15',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0004'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0004'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0006: Suresh Nambiar
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -379,7 +384,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0006'),'vaccination',
  'Annual Influenza & Pneumococcal Vaccine',
  'Influenza QIV administered. PCV13 given (diabetic patient). Both tolerated without adverse effects.',
- '2025-01-20',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0002'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0002'));
+ '2025-01-20',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0002'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0002'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0007: Fatima Sheikh
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -406,7 +412,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0007'),'lab_report',
  'Postpartum Thyroid Check',
  'TSH: 3.4 mIU/L post-delivery. Returning to pre-pregnancy dose. Monitor for postpartum thyroiditis at 3 months.',
- '2025-04-10',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0002'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0002'));
+ '2025-04-10',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0002'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0002'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0008: Aryan Verma
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -433,7 +440,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0008'),'hospital_visit',
  'Neurology Review — Seizure Free',
  'Seizure free for 14 months on dual AEDs. Driving licence not yet reinstated (< 1 year seizure free). Continue current regimen. Review in 6 months.',
- '2025-03-28',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0004'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0004'));
+ '2025-03-28',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0004'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0004'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0009: Meera Pillai
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -460,7 +468,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0009'),'vaccination',
  'Shingles Vaccine',
  'Shingrix (RZV) 1st dose administered (age ≥60 indication). 2nd dose due in 2-6 months. No adverse effects.',
- '2025-02-18',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0009'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0009'));
+ '2025-02-18',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0009'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0009'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0010: Dinesh Rao
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -487,7 +496,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0010'),'prescription',
  'Long-Term PPI Therapy',
  'Pantoprazole 40 mg OD 30 min before breakfast. Antacid gel PRN. Avoid NSAIDs, coffee, alcohol, and late meals. Colonoscopy recommended at age 45.',
- '2025-01-30',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0007'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0007'));
+ '2025-01-30',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0007'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0007'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0011: Anita Sharma
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -514,7 +524,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0011'),'hospital_visit',
  'AF Review — Rate Controlled',
  'Ventricular rate 78 bpm. INR 2.4 (therapeutic). Thyroid function improving. Carbimazole dose reduced. Echocardiogram: LA size normalising.',
- '2025-03-22',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0001'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0001'));
+ '2025-03-22',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0001'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0001'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0012: Kiran Desai
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -541,7 +552,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0012'),'hospital_visit',
  'Dermatology Review — Good Response',
  'PASI score reduced to 4 (90% improvement). Patient satisfied. Continue maintenance Methotrexate. 6-monthly review. Screen for TB before biologic if needed.',
- '2025-04-07',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0010'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0010'));
+ '2025-04-07',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0010'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0010'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0013: Sunita Garg
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -568,7 +580,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0013'),'prescription',
  'COPD Maintenance Therapy',
  'Tiotropium 18 mcg via HandiHaler OD. Formoterol/Budesonide 12/400 mcg BD. Rescue salbutamol PRN. Smoking cessation support. Pulmonary rehabilitation enrolled.',
- '2025-01-08',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0006'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0006'));
+ '2025-01-08',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0006'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0006'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0014: Vivek Malhotra
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -595,7 +608,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0014'),'hospital_visit',
  'Post-Op Physiotherapy Review',
  'Knee flexion 0-110°. Quadriceps strength 80% compared to contralateral limb. Return to light jogging cleared. Sport-specific training in 4 weeks.',
- '2023-01-22',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0005'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0005'));
+ '2023-01-22',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0005'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0005'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0015: Rekha Joshi
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -622,7 +636,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0015'),'lab_report',
  'Topiramate Metabolic Monitoring',
  'Serum bicarbonate: 20 mEq/L (mildly low — topiramate effect). Renal function normal. No kidney stones on ultrasound. Increase fluid intake advised.',
- '2025-02-26',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0004'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0004'));
+ '2025-02-26',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0004'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0004'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0016: Praveen Kumar
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -649,7 +664,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0016'),'vaccination',
  'Herpes Zoster Vaccine',
  'Shingrix (RZV) dose 1 administered (age ≥60 indication). 2nd dose scheduled in 3 months. Patient counselled on expected mild injection site reactions.',
- '2025-01-15',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0009'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0009'));
+ '2025-01-15',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0009'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0009'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0017: Nandita Roy
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -676,7 +692,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0017'),'hospital_visit',
  'Gynaecology Follow-up',
  'Cycles now every 35 days (improved). Acne 70% reduced. Weight stable. No fertility concerns raised at this visit. Continue current regimen. Annual review.',
- '2025-05-20',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0008'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0008'));
+ '2025-05-20',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0008'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0008'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0018: Amar Singh
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -703,7 +720,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0018'),'hospital_visit',
  'Physiotherapy & Fall Prevention',
  'Two falls in past 6 months. Berg Balance Scale 38/56. Gait training and balance exercises programme started. Walking aid (tripod stick) recommended.',
- '2025-04-02',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0004'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0004'));
+ '2025-04-02',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0004'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0004'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0019: Geeta Pandey
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -730,7 +748,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0019'),'hospital_visit',
  'Rheumatology Review — Stable',
  'SLEDAI score 4 (mild activity). Urine PCR normalised. Prednisolone tapered to 5 mg. Hydroxychloroquine eye check due. Continue monitoring.',
- '2025-06-11',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0004'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0004'));
+ '2025-06-11',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0004'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0004'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0020: Siddharth Chandra
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -757,7 +776,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0020'),'hospital_visit',
  'Diabetology Annual Review',
  'No complications detected. Patient managing well with basal-bolus. CGM (FreeStyle Libre) discussed and prescribed. Annual dilated eye exam and microalbumin check booked.',
- '2025-05-30',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0002'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0002'));
+ '2025-05-30',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0002'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0002'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0021: Pooja Menon
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -784,7 +804,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0021'),'hospital_visit',
  'GI Review — Symptom Improvement',
  'Symptom frequency reduced by 60% on low-FODMAP diet. Bristol Stool Scale improved. Bloating mild. Continue Mebeverine PRN. Reassurance provided. Annual review.',
- '2024-11-12',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0007'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0007'));
+ '2024-11-12',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0007'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0007'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0022: Harish Tiwari
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -811,7 +832,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0022'),'hospital_visit',
  'Joint Health Review',
  'No tophi palpable. No joint erosions on X-ray. Uric acid 5.4 mg/dL. BP 126/80. Patient very compliant. Reduce allopurinol to 200 mg if uric acid <5 on next check.',
- '2025-07-14',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0009'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0009'));
+ '2025-07-14',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0009'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0009'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0023: Shweta Bansal
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -838,7 +860,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0023'),'hospital_visit',
  'Annual Thyroid & Haematology Check',
  'TSH 2.1 mIU/L. Hb 13.2 g/dL. Ferritin 42 ng/mL. Both conditions well-controlled. Continue levothyroxine 75 mcg, ferrous sulphate discontinued (repleted). Annual review.',
- '2025-01-09',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0002'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0002'));
+ '2025-01-09',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0002'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0002'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0024: Manoj Kulkarni
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -865,7 +888,8 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0024'),'hospital_visit',
  'Cardiology 3-Month Review',
  'NYHA Class II (improved from III). BNP 420 pg/mL (improved). Weight stable. No hospitalisation since last visit. ICD implantation discussed given EF <35% history.',
- '2025-07-08',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0001'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0001'));
+ '2025-07-08',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0001'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0001'))
+ON CONFLICT DO NOTHING;
 
 -- PAT-0025: Kaveri Nair
 INSERT INTO clinical_records (patient_id, record_type, title, description, date, verified, verified_by, created_by) VALUES
@@ -892,6 +916,7 @@ INSERT INTO clinical_records (patient_id, record_type, title, description, date,
 ((SELECT id FROM patients WHERE patient_id='PAT-0025'),'hospital_visit',
  'Well Woman Screening',
  'Pap smear: normal (NILM). Breast exam: no lumps. BMI 22.1. BP 110/70. Vitamins and iron-rich diet reinforced. Next cervical screening in 3 years.',
- '2025-03-18',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0009'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0009'));
+ '2025-03-18',TRUE,(SELECT id FROM doctors WHERE registration_number='DOC-REG-0009'),(SELECT id FROM doctors WHERE registration_number='DOC-REG-0009'))
+ON CONFLICT DO NOTHING;
 
 COMMIT;

@@ -15,8 +15,10 @@
 import { Router, type Request, type Response, type NextFunction, type RequestHandler } from 'express';
 import {
   AiServiceError,
+  ValidationError,
   addAuditEvent,
   addRecord,
+  createPatient,
   generateAiSummary,
   getAssignedPatients,
   getAuditLogs,
@@ -26,6 +28,7 @@ import {
   getRecords,
   isDoctorAssigned,
   isUniqueViolation,
+  listFacilities,
   serializeAuditEvent,
   serializeSummary,
   updateRecord,
@@ -133,6 +136,53 @@ router.get('/doctors/:doctorId/patients', wrap(async (req, res) => {
     return;
   }
   res.json(await getAssignedPatients(doctor.id));
+}));
+
+// ─── Facilities (read-only lookup for the Add Patient form) ──────────────────
+
+router.get('/facilities', wrap(async (_req, res) => {
+  res.json(await listFacilities());
+}));
+
+// ─── Patients (create — doctor-only) ──────────────────────────────────────────
+
+/**
+ * POST /api/patients?doctorReg=DOC-REG-XXXX
+ * Any verified doctor may register a new patient. The creating doctor is
+ * automatically assigned to the new patient (otherwise they could never see
+ * a patient they themselves just added — access control requires an
+ * assignment row). patientId / healthId are generated server-side.
+ */
+router.post('/patients', wrap(async (req, res) => {
+  const doctor = await authenticateDoctor(req, res);
+  if (!doctor) return;
+
+  const { name, age, gender, allergies, chronicConditions, currentMedicines, facilityId } = req.body ?? {};
+
+  try {
+    const toStringArray = (v: unknown): string[] | undefined =>
+      v === undefined ? undefined : Array.isArray(v) ? v.map(String).map((s) => s.trim()).filter(Boolean) : undefined;
+
+    const patient = await createPatient(
+      {
+        name: String(name ?? ''),
+        age: Number(age),
+        gender: String(gender ?? ''),
+        allergies: toStringArray(allergies),
+        chronicConditions: toStringArray(chronicConditions),
+        currentMedicines: toStringArray(currentMedicines),
+        facilityId: facilityId === undefined || facilityId === null || facilityId === '' ? null : Number(facilityId),
+      },
+      doctor.id,
+    );
+
+    await addAuditEvent(patient.id, 'PATIENT_ADDED', doctor.name, `${doctor.registrationNumber} registered new patient ${patient.patientId}: ${patient.name}`, 'success');
+    res.status(201).json(patient);
+  } catch (err) {
+    if (err instanceof ValidationError) { res.status(err.httpStatus).json({ error: err.message }); return; }
+    if (isUniqueViolation(err)) { res.status(409).json({ error: 'A patient with that identifier already exists. Please try again.' }); return; }
+    throw err;
+  }
 }));
 
 // ─── Patients (read) ──────────────────────────────────────────────────────────

@@ -2,8 +2,8 @@
  * lib/db/src/index.ts
  *
  * Drizzle db instance + all table exports.
- * No .ts extension on imports — allowImportingTsExtensions is not enabled.
- * The legacy schema/ folder must be deleted so './schema' resolves to schema.ts
+ * DATABASE_URL must be set before this module loads.
+ * api-server/src/app.ts loads dotenv first, so this is safe.
  */
 
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -28,4 +28,5 @@ export {
   aiSummariesTable,
   auditLogsTable,
   consentsTable,
+  doctorPatientAssignmentsTable,
 } from './schema';

@@ -14,6 +14,7 @@ import {
   date,
   timestamp,
   jsonb,
+  unique,
 } from 'drizzle-orm/pg-core';
 
 // ─── Facilities ───────────────────────────────────────────────────────────────
@@ -124,3 +125,18 @@ export const consentsTable = pgTable('consents', {
   requestedAt:   timestamp('requested_at', { withTimezone: true }).defaultNow().notNull(),
   expiresAt:     timestamp('expires_at', { withTimezone: true }),
 });
+
+// ─── Doctor ↔ Patient assignments (access control) ───────────────────────────
+// A doctor may only read/write patients that have a row here.
+export const doctorPatientAssignmentsTable = pgTable(
+  'doctor_patient_assignments',
+  {
+    id:         serial('id').primaryKey(),
+    doctorId:   integer('doctor_id').notNull().references(() => doctorsTable.id),
+    patientId:  integer('patient_id').notNull().references(() => patientsTable.id),
+    assignedAt: timestamp('assigned_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    uqDoctorPatient: unique('uq_doctor_patient').on(t.doctorId, t.patientId),
+  }),
+);

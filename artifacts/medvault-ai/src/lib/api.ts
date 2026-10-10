@@ -1,19 +1,13 @@
 /**
  * artifacts/medvault-ai/src/lib/api.ts
  *
- * Typed fetch helpers. Field names match what medvault-routes.ts actually returns.
+ * Typed fetch helpers. Field names match what the Express API really returns.
+ * Every doctor-initiated call sends ?doctorReg=… — the backend then checks the
+ * doctor↔patient assignment (403 if the patient is not assigned to that doctor).
  */
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface Facility {
-  id: number;
-  name: string;
-  city: string;
-  state: string;
-}
-
-/** Matches GET /api/patients/:patientId response exactly */
 export interface Patient {
   id: number;
   patientId: string;
@@ -25,18 +19,20 @@ export interface Patient {
   chronicConditions: string[];
   currentMedicines: string[];
   facilityId: number | null;
-  createdAt: string;
-  updatedAt: string;
+  facilityName: string | null;
 }
 
-/** Matches GET /api/patients/:patientId/records response exactly */
+export type RecordType =
+  | 'diagnosis' | 'surgery' | 'lab_report' | 'prescription'
+  | 'vaccination' | 'hospital_visit' | 'allergy_note';
+
 export interface ClinicalRecord {
   id: number;
   patientId: number;
-  recordType: string;    // e.g. "diagnosis", "surgery", "lab_report"
+  recordType: RecordType;
   title: string;
   description: string;
-  date: string;          // "2025-08-10"
+  date: string;
   verified: boolean;
   verifiedBy: number | null;
   createdBy: number | null;
@@ -46,44 +42,44 @@ export interface ClinicalRecord {
   deletedAt: string | null;
 }
 
-/** Matches GET /api/doctors/:registrationNumber response exactly */
 export interface Doctor {
   id: number;
   registrationNumber: string;
   name: string;
   specialization: string;
   facilityId: number | null;
-  facility?: string;   // present when backend joins facility name (doctors.ts route does this)
-  city?: string;
+  facility: string | null;
   email: string;
   role: string;
   verified: boolean;
 }
 
-/**
- * Matches the JSON shape produced by generateAiSummary() in lib/medvault.ts.
- * Gemini returns ONE object, not an array of claims.
- */
-export interface AiSummaryClaims {
+export interface SummarySource {
+  claim: string;
+  recordId: number;
+  recordTitle: string;
+  recordDate: string;
+}
+
+export interface SummaryClaims {
   allergies?: string[];
   medicines?: string[];
   conditions?: string[];
   surgeries?: string[];
   labFindings?: string[];
   vaccinations?: string[];
-  timeline?: { date: string; event: string }[];
+  timeline?: { date: string; event: string; recordId?: number | null }[];
   alerts?: string[];
   needsVerification?: string[];
-  raw?: string; // fallback if Gemini's response wasn't valid JSON
+  sources?: SummarySource[];
 }
 
-/** Matches GET /api/patients/:patientId/summary */
 export interface AiSummary {
   id: number;
   patientId: number;
   generatedAt: string;
   generatedBy: string;
-  claims: AiSummaryClaims | null;
+  claims: SummaryClaims | null;
   disclaimer: string | null;
   recordCount: number;
 }
@@ -97,16 +93,31 @@ export interface AuditLog {
   tone: string;
 }
 
-export type PatientSummary = Patient;
-
-/** Form shape used by the Add/Edit record UI. Mapped to backend fields on submit. */
+/** What the add/edit form edits (maps 1:1 onto the DB columns). */
 export interface RecordFormData {
   title: string;
-  category: string;     // UI label → mapped to recordType
-  recordDate: string;    // UI label → mapped to date
-  detail: string;        // UI label → mapped to description
-  sourceDocument: string; // UI-only; not persisted (no sourceDocument column)
-  status: string;         // "Verified" | "Pending" | "Unverified" → mapped to verified boolean
+  recordType: RecordType;
+  date: string;
+  description: string;
+  verified: boolean;
+}
+
+export interface Facility {
+  id: number;
+  name: string;
+  city: string;
+  state: string;
+}
+
+/** What the "Add Patient" form submits. */
+export interface NewPatientData {
+  name: string;
+  age: number;
+  gender: 'Male' | 'Female' | 'Other';
+  allergies: string[];
+  chronicConditions: string[];
+  currentMedicines: string[];
+  facilityId: number | null;
 }
 
 // ─── Base fetch ───────────────────────────────────────────────────────────────
@@ -119,85 +130,67 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     let message = `HTTP ${res.status}`;
     try {
-      const b = await res.json();
+      const b = (await res.json()) as { error?: string; message?: string };
       message = b.error ?? b.message ?? message;
-    } catch {
-      /* ignore parse failure */
-    }
+    } catch { /* non-JSON error body */ }
     throw new Error(message);
   }
-  // 204 No Content etc.
-  const text = await res.text();
-  return (text ? JSON.parse(text) : null) as T;
+  return res.json() as Promise<T>;
 }
 
-// ─── Patient ─────────────────────────────────────────────────────────────────
+const q = (doctorReg: string) => `doctorReg=${encodeURIComponent(doctorReg)}`;
+/** Query string for reads: doctor mode when a reg number is given, patient-portal mode otherwise. */
+const qOpt = (doctorReg?: string) => (doctorReg ? `?${q(doctorReg)}` : '');
+const pid = (id: string) => encodeURIComponent(id);
 
-export const getPatient = (id: string) =>
-  apiFetch<Patient>(`/patients/${encodeURIComponent(id)}`);
-
-export const getPatientRecords = (id: string) =>
-  apiFetch<ClinicalRecord[]>(`/patients/${encodeURIComponent(id)}/records`);
-
-export const getPatientSummary = (id: string) =>
-  apiFetch<AiSummary | null>(`/patients/${encodeURIComponent(id)}/summary`);
-
-export const getAuditLogs = (id: string) =>
-  apiFetch<AuditLog[]>(`/patients/${encodeURIComponent(id)}/audit-logs`);
-
-// ─── Doctor ───────────────────────────────────────────────────────────────────
+// ─── Doctor-scoped reads ──────────────────────────────────────────────────────
 
 export const getDoctor = (regNum: string) =>
   apiFetch<Doctor>(`/doctors/${encodeURIComponent(regNum)}`);
 
-/** GET /api/doctors/:registrationNumber/patients — the real endpoint, not a flat /patients list */
-export const getDoctorPatients = (regNum: string) =>
-  apiFetch<Patient[]>(`/doctors/${encodeURIComponent(regNum)}/patients`);
+/** ONLY this doctor's assigned patients. */
+export const getDoctorPatients = (doctorReg: string) =>
+  apiFetch<Patient[]>(`/doctors/${encodeURIComponent(doctorReg)}/patients?${q(doctorReg)}`);
 
-// ─── Records (doctor-only writes) ─────────────────────────────────────────────
+/** doctorReg omitted → patient-portal read (own data, read-only). */
+export const getPatient = (id: string, doctorReg?: string) =>
+  apiFetch<Patient>(`/patients/${pid(id)}${qOpt(doctorReg)}`);
 
-function toRecordType(category: string): string {
-  return category.toLowerCase().replace(/\s+/g, '_');
-}
+export const getPatientRecords = (id: string, doctorReg?: string) =>
+  apiFetch<ClinicalRecord[]>(`/patients/${pid(id)}/records${qOpt(doctorReg)}`);
 
-export const addRecord = (patientId: string, doctorReg: string, data: RecordFormData) =>
-  apiFetch<ClinicalRecord>(
-    `/patients/${encodeURIComponent(patientId)}/records?doctorReg=${encodeURIComponent(doctorReg)}`,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        recordType:  toRecordType(data.category),
-        title:       data.title,
-        description: data.detail,
-        date:        data.recordDate,
-        verified:    data.status === 'Verified',
-      }),
-    },
-  );
+export const getPatientSummary = (id: string, doctorReg?: string) =>
+  apiFetch<AiSummary | null>(`/patients/${pid(id)}/summary${qOpt(doctorReg)}`);
 
-export const updateRecord = (
-  recordId: number,
-  patientId: string,
-  doctorReg: string,
-  data: Partial<RecordFormData>,
-) =>
-  apiFetch<ClinicalRecord>(
-    `/records/${recordId}?doctorReg=${encodeURIComponent(doctorReg)}&patientId=${encodeURIComponent(patientId)}`,
-    {
-      method: 'PATCH',
-      body: JSON.stringify({
-        // FIX: category was previously dropped on update, silently reverting recordType
-        ...(data.category !== undefined ? { recordType: toRecordType(data.category) } : {}),
-        ...(data.title !== undefined ? { title: data.title } : {}),
-        ...(data.detail !== undefined ? { description: data.detail } : {}),
-        ...(data.recordDate !== undefined ? { date: data.recordDate } : {}),
-        ...(data.status !== undefined ? { verified: data.status === 'Verified' } : {}),
-      }),
-    },
-  );
+export const getAuditLogs = (id: string, doctorReg: string) =>
+  apiFetch<AuditLog[]>(`/patients/${pid(id)}/audit-logs?${q(doctorReg)}`);
 
-export const generatePatientSummary = (patientId: string, doctorReg: string) =>
-  apiFetch<AiSummary>(
-    `/patients/${encodeURIComponent(patientId)}/summary/generate?doctorReg=${encodeURIComponent(doctorReg)}`,
-    { method: 'POST' },
-  );
+// ─── Doctor-only writes ───────────────────────────────────────────────────────
+
+export const addRecord = (id: string, doctorReg: string, data: RecordFormData) =>
+  apiFetch<ClinicalRecord>(`/patients/${pid(id)}/records?${q(doctorReg)}`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+export const updateRecord = (recordId: number, id: string, doctorReg: string, data: RecordFormData) =>
+  apiFetch<ClinicalRecord>(`/records/${recordId}?${q(doctorReg)}&patientId=${pid(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+
+export const generatePatientSummary = (id: string, doctorReg: string) =>
+  apiFetch<AiSummary>(`/patients/${pid(id)}/summary/generate?${q(doctorReg)}`, { method: 'POST' });
+
+// ─── Facilities ───────────────────────────────────────────────────────────────
+
+export const listFacilities = () => apiFetch<Facility[]>('/facilities');
+
+// ─── Add Patient (doctor-only) ─────────────────────────────────────────────────
+
+/** Creates a patient and auto-assigns the creating doctor to them. */
+export const createPatient = (doctorReg: string, data: NewPatientData) =>
+  apiFetch<Patient>(`/patients?${q(doctorReg)}`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });

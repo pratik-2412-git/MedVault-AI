@@ -87,6 +87,87 @@ export async function getAssignedPatients(doctorId: number): Promise<PatientWith
   return rows.map((r) => ({ ...r.patient, facilityName: r.facilityName }));
 }
 
+/** Validation error whose message is safe to show the doctor in the UI. */
+export class ValidationError extends Error {
+  constructor(message: string, public httpStatus = 400) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
+
+async function nextSequentialCode(prefix: 'PAT' | 'HLT-IND-2048', width: number, column: typeof patientsTable.patientId | typeof patientsTable.healthId): Promise<string> {
+  const rows = await db.select({ code: column }).from(patientsTable);
+  let max = 0;
+  for (const r of rows) {
+    const m = /(\d+)$/.exec(r.code);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return `${prefix}-${String(max + 1).padStart(width, '0')}`;
+}
+
+/**
+ * Creates a new patient AND assigns them to the creating doctor in one transaction,
+ * so the doctor can see the patient they just added (access control requires an
+ * assignment row — see isDoctorAssigned). patientId / healthId are generated
+ * server-side; on a rare unique-constraint race the insert is retried once.
+ */
+export async function createPatient(
+  data: {
+    name: string;
+    age: number;
+    gender: string;
+    allergies?: string[];
+    chronicConditions?: string[];
+    currentMedicines?: string[];
+    facilityId?: number | null;
+  },
+  createdByDoctorId: number,
+): Promise<PatientWithFacility> {
+  if (!data.name.trim()) throw new ValidationError('Patient name is required.');
+  if (!Number.isInteger(data.age) || data.age < 0 || data.age > 130) {
+    throw new ValidationError('Age must be a whole number between 0 and 130.');
+  }
+  if (!['Male', 'Female', 'Other'].includes(data.gender)) {
+    throw new ValidationError('Gender must be Male, Female or Other.');
+  }
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const patientId = await nextSequentialCode('PAT', 4, patientsTable.patientId);
+    const healthId = await nextSequentialCode('HLT-IND-2048', 5, patientsTable.healthId);
+    try {
+      const [created] = await db
+        .insert(patientsTable)
+        .values({
+          patientId,
+          healthId,
+          name: data.name.trim(),
+          age: data.age,
+          gender: data.gender,
+          allergies: data.allergies ?? [],
+          chronicConditions: data.chronicConditions ?? [],
+          currentMedicines: data.currentMedicines ?? [],
+          facilityId: data.facilityId ?? null,
+        })
+        .returning();
+
+      await db.insert(doctorPatientAssignmentsTable).values({ doctorId: createdByDoctorId, patientId: created.id });
+
+      const facility = created.facilityId
+        ? (await db.select({ name: facilitiesTable.name }).from(facilitiesTable).where(eq(facilitiesTable.id, created.facilityId)).limit(1))[0]
+        : undefined;
+      return { ...created, facilityName: facility?.name ?? null };
+    } catch (err) {
+      if (isUniqueViolation(err) && attempt < 2) continue; // another insert took this code — retry
+      throw err;
+    }
+  }
+  throw new Error('Could not generate a unique Patient ID after several attempts. Please try again.');
+}
+
+export async function listFacilities() {
+  return db.select({ id: facilitiesTable.id, name: facilitiesTable.name, city: facilitiesTable.city, state: facilitiesTable.state }).from(facilitiesTable).orderBy(facilitiesTable.name);
+}
+
 // ─── Clinical records ─────────────────────────────────────────────────────────
 
 export async function getRecords(patientDbId: number): Promise<ClinicalRecord[]> {
