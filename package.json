@@ -15,7 +15,7 @@
   },
   "scripts": {
     "dev": "pnpm --parallel run dev",
-    "build": "pnpm --filter @workspace/medvault-ai build && pnpm --filter @workspace/api-server build && node scripts/copy-frontend.mjs",
+    "build": "pnpm --filter @workspace/medvault-ai build && node scripts/copy-frontend.mjs",
     "start": "pnpm --filter @workspace/api-server start",
     "db:schema": "psql -U postgres -d medvault -f lib/db/schema.sql",
     "db:seed": "psql -U postgres -d medvault -f lib/db/seed.sql"
