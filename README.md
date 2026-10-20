@@ -4,7 +4,7 @@
 
 A role-based medical records platform with AI-powered clinical summaries. Doctors manage patient records and generate AI clinical summaries; patients get secure, read-only access to their own history. Every sensitive action is audit-logged.
 
-**Live demo:** _add your Railway URL here once deployed_
+**Live demo:**https://medvault-ai-production.up.railway.app/
 
 ---
 
