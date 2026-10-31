@@ -30,18 +30,126 @@ India's medical records are fragmented across hospitals, clinics, labs, and pape
 
 ```
 MedVault-AI/
+│
+├── .agents/
+│   └── skills/
+│
+├── .conversation/
+│
 ├── artifacts/
-│   ├── api-server/        # Express backend
-│   └── medvault-ai/       # React + Vite frontend
+│   └── api-server/
+│       └── .replit-artifact/
+│           └── artifact.toml
+│
+├── api-server/
+│   ├── dist/
+│   ├── node_modules/
+│   └── src/
+│       ├── lib/
+│       │   ├── .gitkeep
+│       │   ├── logger.ts
+│       │   └── medvault.ts
+│       │
+│       ├── middlewares/
+│       │   └── .gitkeep
+│       │
+│       ├── routes/
+│       │   ├── index.ts
+│       │   └── medvault-routes.ts
+│       │
+│       ├── services/
+│       │   └── ai.ts
+│       │
+│       ├── app.ts
+│       ├── env.ts
+│       └── index.ts
+│
+│   ├── .env
+│   ├── .tsbuildinfo
+│   ├── build.mjs
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── start-api.cmd
+│   └── tsconfig.api-server.json
+│
+├── medvault-ai/
+│   ├── dist/
+│   ├── node_modules/
+│   ├── public/
+│   │
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── ui/
+│   │   │   └── error-boundary.tsx
+│   │   │
+│   │   ├── hooks/
+│   │   │   ├── use-mobile.tsx
+│   │   │   └── use-toast.ts
+│   │   │
+│   │   ├── lib/
+│   │   │   ├── api.ts
+│   │   │   ├── recordTypes.ts
+│   │   │   └── utils.ts
+│   │   │
+│   │   ├── pages/
+│   │   │   ├── DoctorDashboard.tsx
+│   │   │   ├── DoctorLogin.tsx
+│   │   │   ├── Landing.tsx
+│   │   │   ├── not-found.tsx
+│   │   │   ├── PatientDashboard.tsx
+│   │   │   └── PatientLogin.tsx
+│   │   │
+│   │   ├── App.tsx
+│   │   ├── index.css
+│   │   ├── index.ts
+│   │   ├── main.tsx
+│   │   └── vite-env.d.ts
+│   │
+│   ├── components.json
+│   ├── index.html
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── tsconfig.tsbuildinfo
+│   └── vite.config.ts
+│
 ├── lib/
-│   └── db/
-│       ├── schema.sql              # Core tables
-│       ├── migrations/
-│       │   └── 002_dedupe_and_assignments.sql   # Adds doctor_patient_assignments
-│       ├── seed.sql                # 25 patients, 12 doctors, clinical records
-│       └── seed-assignments.sql    # Doctor ↔ patient relationships
-└── scripts/
-    └── copy-frontend.mjs   # Copies built frontend into api-server/public for single-service deploy
+│   ├── api-client-react/
+│   ├── api-spec/
+│   ├── api-zod/
+│   ├── db/
+│   └── drizzle-orm/
+│
+├── node_modules/
+│   ├── .pnpm/
+│   ├── drizzle-orm/
+│   ├── .modules.yaml
+│   ├── .package-map.json
+│   └── .pnpm-workspace-state-v1.json
+│
+├── scripts/
+│   ├── node_modules/
+│   ├── src/
+│   │   └── hello.ts
+│   ├── copy-frontend.mjs
+│   ├── package.json
+│   ├── post-merge.sh
+│   ├── seed.ts
+│   ├── tsconfig.json
+│   └── tsconfig.tsbuildinfo
+│
+├── .env
+├── .gitignore
+├── .npmrc
+├── .replit
+├── install-log.txt
+├── package.json
+├── pnpm-lock.yaml
+├── pnpm-workspace.yaml
+├── README.md
+├── replit.md
+├── schema.sql
+├── tsconfig.base.json
+└── tsconfig.json
 ```
 
 ---
